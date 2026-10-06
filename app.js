@@ -1,44 +1,715 @@
 (() => {
   "use strict";
-  const exercises=window.CUBE_EXERCISES||[], $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)], clone=m=>m.map(r=>[...r]);
-  const labels={numbers:"תרשים מספרים",top:"מבט מלמעלה",front:"מבט מלפנים",left:"מבט משמאל",right:"מבט מימין"};
-  const answerGrid=value=>Array.from({length:5},()=>Array(5).fill(value));
-  const initialAnswer=type=>type==="match-structure"?{selected:null}:{...(type==="structure-to-views"?{numbers:answerGrid(0)}:{}),top:answerGrid(false),front:answerGrid(false),left:answerGrid(false),right:answerGrid(false)};
-  const blankState=()=>({exerciseIndex:0,progress:Object.fromEntries(exercises.map(ex=>[ex.id,{current:0,done:Array(ex.questions.length).fill(false),answers:ex.questions.map(()=>initialAnswer(ex.type))}]))});
-  const storageKey="cube-workbook-modular-v1";let state=blankState();
-  try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.progress)state=saved}catch(e){}
-  const currentExercise=()=>exercises[state.exerciseIndex], currentProgress=()=>state.progress[currentExercise().id], currentQuestion=()=>currentExercise().questions[currentProgress().current];
-  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-  function save(){localStorage.setItem(storageKey,JSON.stringify(state));updateProgress()}
 
-  function crop(matrix,isActive){const cells=[];matrix.forEach((row,r)=>row.forEach((value,c)=>{if(isActive(value))cells.push([r,c])}));if(!cells.length)return[];const rs=cells.map(x=>x[0]),cs=cells.map(x=>x[1]),r0=Math.min(...rs),r1=Math.max(...rs),c0=Math.min(...cs),c1=Math.max(...cs);return matrix.slice(r0,r1+1).map(row=>row.slice(c0,c1+1))}
-  const normalized=(matrix,key)=>crop(matrix,key==="numbers"?v=>v>0:Boolean);
-  function projections(grid){const rows=grid.length,cols=grid[0].length,max=Math.max(...grid.flat());const silhouette=(heights,width)=>Array.from({length:max},(_,r)=>Array.from({length:width},(_,c)=>heights[c]>=max-r));const frontHeights=Array.from({length:cols},(_,c)=>Math.max(...grid.map(row=>row[c]))),depthHeights=grid.map(row=>Math.max(...row));return{numbers:clone(grid),top:grid.map(row=>row.map(Boolean)),front:silhouette(frontHeights,cols),left:silhouette(depthHeights,rows),right:silhouette([...depthHeights].reverse(),rows)}}
+  const exercises = window.CUBE_EXERCISES || [];
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const clone = m => m.map(r => [...r]);
 
-  function renderExerciseTabs(){const root=$("#exercise-tabs");root.innerHTML="";exercises.forEach((ex,i)=>{const p=state.progress[ex.id],b=document.createElement("button");b.className="exercise-tab"+(i===state.exerciseIndex?" active":"");b.innerHTML=`תרגיל ${ex.number}<small>עמוד${ex.pages.includes('–')?'ים':''} ${ex.pages} · ${p.done.filter(Boolean).length}/${ex.questions.length}</small>`;b.onclick=()=>{state.exerciseIndex=i;save();render()};root.append(b)})}
-  function renderQuestionNav(){const ex=currentExercise(),p=currentProgress(),root=$("#question-nav");root.style.gridTemplateColumns=`repeat(${Math.min(ex.questions.length,8)},1fr)`;root.innerHTML="";ex.questions.forEach((q,i)=>{const b=document.createElement("button");b.className="question-chip"+(i===p.current?" active":"")+(p.done[i]?" done":"");b.textContent=q.label;b.onclick=()=>{p.current=i;save();render()};root.append(b)})}
-  function updateProgress(){if(!exercises.length)return;const ex=currentExercise(),p=currentProgress(),n=p.done.filter(Boolean).length;$("#progress-name").textContent=`תרגיל ${ex.number}`;$("#progress-label").textContent=`${n} מתוך ${ex.questions.length}`;$("#progress-bar").style.width=`${n/ex.questions.length*100}%`;$$('.question-chip').forEach((b,i)=>b.classList.toggle('done',p.done[i]))}
+  const labels = {
+    numbers: "תרשים מספרים",
+    top: "מבט מלמעלה",
+    front: "מבט מלפנים",
+    left: "מבט משמאל",
+    right: "מבט מימין"
+  };
 
-  function paintGrid(matrix,key){const p=currentProgress(),root=document.createElement("div");root.className="cell-grid";root.style.gridTemplateColumns="repeat(5,max-content)";matrix.forEach((row,r)=>row.forEach((value,c)=>{const b=document.createElement("button");b.className="cell paint"+(value?" on":"");b.setAttribute("aria-label",`${labels[key]}, שורה ${r+1}, עמודה ${c+1}`);b.onclick=()=>{p.answers[p.current][key][r][c]=!value;renderActivity();save()};root.append(b)}));return root}
-  function numberGrid(matrix){const p=currentProgress(),root=document.createElement("div");root.className="cell-grid";root.style.gridTemplateColumns="repeat(5,max-content)";matrix.forEach((row,r)=>row.forEach((value,c)=>{const b=document.createElement("button");b.className="cell number"+(value?" nonzero":"");b.innerHTML=`<span>${value}</span>${value?'<span class="minus">−</span>':''}`;b.setAttribute("aria-label",`תרשים מספרים, שורה ${r+1}, עמודה ${c+1}, גובה ${value}`);b.onclick=e=>{p.answers[p.current].numbers[r][c]=e.target.closest('.minus')?Math.max(0,value-1):(value+1)%6;renderActivity();save()};root.append(b)}));return root}
-  function answerZones(keys,results=null){const p=currentProgress(),answer=p.answers[p.current],root=document.createElement("div");root.className="answer-zones";keys.forEach(key=>{const zone=document.createElement("section");zone.className=`zone ${key==='numbers'?'numbers ':''}${results?(results[key]?'correct':'wrong'):''}`;zone.innerHTML=`<h3>${labels[key]}</h3>`;zone.append(key==='numbers'?numberGrid(answer[key]):paintGrid(answer[key],key));const status=document.createElement('div');status.className='zone-status';if(results)status.textContent=results[key]?'נכון ✓':'כדאי לבדוק שוב';zone.append(status);root.append(zone)});return root}
-  function feedbackHtml(){return'<div class="actions"><button class="btn primary" id="check-answer">בדיקת תשובה</button><button class="btn secondary" id="clear-answer">ניקוי הסעיף</button></div><div class="feedback" id="feedback" role="status" aria-live="polite"></div>'}
+  const answerGrid = value => Array.from({length: 5}, () => Array(5).fill(value));
 
-  function renderStructureQuestion(){const q=currentQuestion(),root=$("#activity-root");root.innerHTML=`<div class="activity-layout"><article class="activity-card"><span class="question-kicker">סעיף ${q.label}</span><h2>התבוננו במבנה</h2><div class="fixed-viewer"><canvas id="main-canvas"></canvas><div class="front-legend"><i></i> החץ מסמן את החזית</div></div><p class="viewer-caption">התבוננו במבנה מהזווית הנתונה.</p></article><article class="activity-card"><span class="question-kicker">העבודה שלכם</span><h2>השלימו את התרשימים</h2><p class="work-instruction">כל הרשתות ריקות ובגודל אחיד. אפשר למקם את התשובה בכל מקום בתוך הרשת.</p><div id="zones-slot"></div>${feedbackHtml()}</article></div>`;$('#zones-slot').append(answerZones(['numbers','top','front','left','right']));requestAnimationFrame(()=>drawStructure($('#main-canvas'),q.structure,true));bindAnswerActions()}
-  function renderNumberQuestion(){const q=currentQuestion(),root=$("#activity-root");root.innerHTML=`<div class="activity-layout"><article class="activity-card"><span class="question-kicker">סעיף ${q.label}</span><h2>תרשים המספרים הנתון</h2><div class="given-number-wrap"><div><div class="given-number" id="given-number"></div><div class="front-arrow" aria-label="חץ לחזית"></div></div></div></article><article class="activity-card"><span class="question-kicker">העבודה שלכם</span><h2>סרטטו את ארבעת המבטים</h2><p class="work-instruction">לחצו על המשבצות המתאימות. אפשר למקם את התשובה בכל מקום בתוך הרשת.</p><div id="zones-slot"></div>${feedbackHtml()}</article></div>`;const diagram=$('#given-number');diagram.style.gridTemplateColumns=`repeat(${q.numbers[0].length},58px)`;q.numbers.flat().forEach(n=>{const s=document.createElement('span');s.className=n?'':'blank';s.textContent=n||'';diagram.append(s)});$('#zones-slot').append(answerZones(['top','front','left','right']));bindAnswerActions()}
-  function miniView(matrix,title){const box=document.createElement('div');box.className='given-view';box.innerHTML=`<h3>${labels[title]||title}</h3>`;const grid=document.createElement('div');grid.className='mini-grid';grid.style.gridTemplateColumns=`repeat(${matrix[0].length},32px)`;matrix.flat().forEach(v=>{const i=document.createElement('i');if(v)i.className='on';grid.append(i)});box.append(grid);return box}
-  function renderMatchQuestion(){const q=currentQuestion(),p=currentProgress(),answer=p.answers[p.current],root=$("#activity-root");root.innerHTML=`<div class="activity-layout single"><article class="activity-card"><span class="question-kicker">סעיף ${q.label}</span><h2>איזה מבנה מתאים למבטים?</h2><div class="given-views" id="given-views"></div><div class="option-grid" id="option-grid"></div>${feedbackHtml()}</article></div>`;Object.entries(q.views).forEach(([k,m])=>$('#given-views').append(miniView(m,k)));q.options.forEach((structure,i)=>{const b=document.createElement('button');b.className='structure-option'+(answer.selected===i?' selected':'');b.innerHTML=`<span class="option-number">${i+1}</span><canvas></canvas>`;b.onclick=()=>{answer.selected=i;renderActivity();save()};$('#option-grid').append(b);requestAnimationFrame(()=>drawStructure(b.querySelector('canvas'),structure,false))});bindAnswerActions()}
-  function renderActivity(){const type=currentExercise().type;if(type==='structure-to-views')renderStructureQuestion();else if(type==='numbers-to-views')renderNumberQuestion();else renderMatchQuestion()}
+  const initialAnswer = type =>
+    type === "match-structure"
+      ? {selected: null}
+      : {
+          ...(type === "structure-to-views" ? {numbers: answerGrid(0)} : {}),
+          top: answerGrid(false),
+          front: answerGrid(false),
+          left: answerGrid(false),
+          right: answerGrid(false)
+        };
 
-  function bindAnswerActions(){$('#check-answer').onclick=checkAnswer;$('#clear-answer').onclick=clearAnswer}
-  function checkAnswer(){const ex=currentExercise(),q=currentQuestion(),p=currentProgress(),answer=p.answers[p.current],f=$('#feedback');if(ex.type==='match-structure'){const good=answer.selected===q.correct;f.className=`feedback show ${good?'good':'bad'}`;f.textContent=good?'מצוין! בחרתם את המבנה המתאים.':'המבנה שבחרתם אינו מתאים לכל המבטים. נסו שוב.';if(good)p.done[p.current]=true;$$('.structure-option').forEach((b,i)=>{b.classList.toggle('correct',good&&i===q.correct);b.classList.toggle('wrong',!good&&i===answer.selected)})}else{const keys=ex.type==='structure-to-views'?['numbers','top','front','left','right']:['top','front','left','right'],want=projections(ex.type==='structure-to-views'?q.structure:q.numbers),results={};keys.forEach(k=>results[k]=same(normalized(answer[k],k),normalized(want[k],k)));const wrong=keys.filter(k=>!results[k]);const zones=$('#zones-slot');zones.innerHTML='';zones.append(answerZones(keys,results));f.className=`feedback show ${wrong.length?'bad':'good'}`;f.textContent=wrong.length?'עדיין לא הכול מתאים. בדקו שוב את: '+wrong.map(k=>labels[k]).join(', ')+'.':'מצוין! כל התרשימים נכונים.';if(!wrong.length)p.done[p.current]=true}save();renderExerciseTabs();renderQuestionNav()}
-  function clearAnswer(){const ex=currentExercise(),p=currentProgress();p.answers[p.current]=initialAnswer(ex.type);p.done[p.current]=false;save();render()}
+  const blankProgress = ex => ({
+    current: 0,
+    done: Array(ex.questions.length).fill(false),
+    answers: ex.questions.map(() => initialAnswer(ex.type))
+  });
 
-  function drawStructure(canvas,grid,arrow){const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);if(!rect.width)return;canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);const yaw=Math.PI/4,elev=.58,cy=Math.cos(yaw),sy=Math.sin(yaw),ce=Math.cos(elev),se=Math.sin(elev),rows=grid.length,cols=grid[0].length,maxH=Math.max(1,...grid.flat()),span=Math.max(rows,cols),scale=Math.min(rect.width/(span*1.7+3.4),rect.height/(maxH+span*.78+3.6)),ox=rect.width/2,oy=rect.height/2+scale*.1,targetY=(maxH-1)/2;const project=(x,y,z)=>{const yy=y-targetY;return{x:ox+(x*cy-z*sy)*scale,y:oy+(x*sy*se-yy*ce+z*cy*se)*scale,depth:x*sy*ce+yy*se+z*cy*ce}};const cam={x:sy*ce,y:se,z:cy*ce},poly=(pts,fill,stroke='rgba(13,62,71,.75)')=>{ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=stroke;ctx.stroke()};const y=-.5,base=[project(-cols/2,y,-rows/2),project(cols/2,y,-rows/2),project(cols/2,y,rows/2),project(-cols/2,y,rows/2)];poly(base,'rgba(205,231,227,.8)','#80afa9');const corners=[[-.47,-.47,-.47],[.47,-.47,-.47],[.47,.47,-.47],[-.47,.47,-.47],[-.47,-.47,.47],[.47,-.47,.47],[.47,.47,.47],[-.47,.47,.47]],faces=[{ids:[3,2,6,7],n:[0,1,0],l:1.25},{ids:[4,7,6,5],n:[0,0,1],l:1},{ids:[0,1,2,3],n:[0,0,-1],l:.7},{ids:[1,5,6,2],n:[1,0,0],l:.88},{ids:[0,3,7,4],n:[-1,0,0],l:.66}],visible=[];grid.forEach((row,r)=>row.forEach((height,c)=>{for(let h=0;h<height;h++){const x=c-(cols-1)/2,z=r-(rows-1)/2,pts=corners.map(([dx,dy,dz])=>project(x+dx,h+dy,z+dz));faces.forEach(face=>{const facing=face.n[0]*cam.x+face.n[1]*cam.y+face.n[2]*cam.z;if(facing<=.001)return;const p=face.ids.map(i=>pts[i]);visible.push({p,depth:p.reduce((s,v)=>s+v.depth,0)/p.length,fill:`hsl(${174+Math.min(h,7)*5} 58% ${Math.min(68,Math.round(43*face.l))}%)`})})}}));visible.sort((a,b)=>a.depth-b.depth);ctx.lineWidth=Math.max(1,scale*.018);visible.forEach(f=>poly(f.p,f.fill));if(arrow){const start=project(0,-.16,rows/2+1.45),end=project(0,-.16,rows/2+.28),dx=end.x-start.x,dy=end.y-start.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,s=13;ctx.strokeStyle=ctx.fillStyle='#ef463d';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.lineTo(end.x,end.y);ctx.stroke();ctx.beginPath();ctx.moveTo(end.x,end.y);ctx.lineTo(end.x-ux*s-uy*s*.6,end.y-uy*s+ux*s*.6);ctx.lineTo(end.x-ux*s+uy*s*.6,end.y-uy*s-ux*s*.6);ctx.closePath();ctx.fill()}}
+  const blankState = () => ({
+    exerciseIndex: 0,
+    progress: Object.fromEntries(exercises.map(ex => [ex.id, blankProgress(ex)]))
+  });
 
-  function go(delta){const p=currentProgress(),len=currentExercise().questions.length;p.current=Math.max(0,Math.min(len-1,p.current+delta));save();render()}
-  function render(){const ex=currentExercise(),p=currentProgress();renderExerciseTabs();$('#page-ref').textContent=`עמוד${ex.pages.includes('–')?'ים':''} ${ex.pages}`;$('#lesson-title').textContent=`תרגיל ${ex.number}: ${ex.title}`;$('#lesson-instruction').textContent=ex.instruction;renderQuestionNav();renderActivity();$('#position-label').textContent=`סעיף ${p.current+1} מתוך ${ex.questions.length}`;$('#previous').disabled=p.current===0;$('#next').textContent=p.current===ex.questions.length-1?'סיום':'הסעיף הבא';updateProgress();window.scrollTo({top:0})}
-  $('#previous').onclick=()=>go(-1);$('#next').onclick=()=>{const ex=currentExercise(),p=currentProgress();if(p.current<ex.questions.length-1)go(1);else if(p.done.every(Boolean))$('#finish-dialog').showModal();else{const f=$('#feedback');if(f){f.className='feedback show bad';f.textContent='יש עוד סעיפים שלא הושלמו. אפשר לעבור אליהם מהסרגל העליון.'}}};$('#close-dialog').onclick=()=>$('#finish-dialog').close();$('#reset-exercise').onclick=()=>{if(confirm('לאפס את כל התשובות בתרגיל הזה?')){const ex=currentExercise();state.progress[ex.id]={current:0,done:Array(ex.questions.length).fill(false),answers:ex.questions.map(()=>initialAnswer(ex.type))};save();render()}};
-  function webMcp(){const mc=document.modelContext;if(!mc?.registerTool)return;const ctl=new AbortController();Promise.resolve(mc.registerTool({name:'open_cube_exercise',title:'פתיחת תרגיל',description:'פתח תרגיל וסעיף בחוברת מבנים מקוביות.',inputSchema:{type:'object',properties:{exercise:{type:'integer',minimum:1,maximum:3},question:{type:'integer',minimum:1}},required:['exercise'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:({exercise,question=1})=>{const i=exercises.findIndex(x=>x.number===exercise);if(i<0)throw new Error('תרגיל לא קיים');state.exerciseIndex=i;state.progress[exercises[i].id].current=Math.max(0,Math.min(exercises[i].questions.length-1,question-1));save();render();return{exercise,question}}},{signal:ctl.signal})).catch(()=>{})}
-  render();webMcp();
+  // v2 deliberately resets old exercise-2 answers after correcting the workbook data.
+  const storageKey = "cube-workbook-modular-v2";
+  let state = blankState();
+
+  function repairSavedState(saved) {
+    const fresh = blankState();
+    if (!saved || typeof saved !== "object") return fresh;
+
+    fresh.exerciseIndex = Number.isInteger(saved.exerciseIndex)
+      ? Math.max(0, Math.min(exercises.length - 1, saved.exerciseIndex))
+      : 0;
+
+    for (const ex of exercises) {
+      const old = saved.progress?.[ex.id];
+      if (!old) continue;
+
+      const p = fresh.progress[ex.id];
+      p.current = Number.isInteger(old.current)
+        ? Math.max(0, Math.min(ex.questions.length - 1, old.current))
+        : 0;
+
+      if (Array.isArray(old.done)) {
+        p.done = p.done.map((_, i) => Boolean(old.done[i]));
+      }
+
+      if (Array.isArray(old.answers)) {
+        p.answers = p.answers.map((fallback, i) => {
+          const candidate = old.answers[i];
+          if (!candidate || typeof candidate !== "object") return fallback;
+
+          if (ex.type === "match-structure") {
+            return {selected: Number.isInteger(candidate.selected) ? candidate.selected : null};
+          }
+
+          const result = structuredClone ? structuredClone(fallback) : JSON.parse(JSON.stringify(fallback));
+          for (const key of Object.keys(result)) {
+            if (!Array.isArray(candidate[key]) || candidate[key].length !== 5) continue;
+            if (!candidate[key].every(row => Array.isArray(row) && row.length === 5)) continue;
+            result[key] = candidate[key];
+          }
+          return result;
+        });
+      }
+    }
+    return fresh;
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+    state = repairSavedState(saved);
+  } catch (_) {
+    state = blankState();
+  }
+
+  const currentExercise = () => exercises[state.exerciseIndex];
+  const currentProgress = () => state.progress[currentExercise().id];
+  const currentQuestion = () => currentExercise().questions[currentProgress().current];
+
+  function save() {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+    updateProgress();
+  }
+
+  function crop(matrix, isActive) {
+    const cells = [];
+    matrix.forEach((row, r) =>
+      row.forEach((value, c) => {
+        if (isActive(value)) cells.push([r, c]);
+      })
+    );
+    if (!cells.length) return [];
+
+    const rs = cells.map(x => x[0]);
+    const cs = cells.map(x => x[1]);
+    const r0 = Math.min(...rs), r1 = Math.max(...rs);
+    const c0 = Math.min(...cs), c1 = Math.max(...cs);
+
+    return matrix.slice(r0, r1 + 1).map(row => row.slice(c0, c1 + 1));
+  }
+
+  const normalized = (matrix, key) =>
+    crop(matrix, key === "numbers" ? v => v > 0 : Boolean);
+
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  function silhouette(heights) {
+    const max = Math.max(1, ...heights);
+    return Array.from({length: max}, (_, r) =>
+      heights.map(h => h >= max - r)
+    );
+  }
+
+  function projections(grid) {
+    const rows = grid.length;
+    const cols = grid[0].length;
+
+    const frontHeights = Array.from(
+      {length: cols},
+      (_, c) => Math.max(...grid.map(row => row[c]))
+    );
+
+    const depthHeights = grid.map(row => Math.max(...row));
+
+    return {
+      numbers: clone(grid),
+      top: grid.map(row => row.map(Boolean)),
+      front: silhouette(frontHeights),
+      left: silhouette(depthHeights),
+      right: silhouette([...depthHeights].reverse())
+    };
+  }
+
+  function structureToVoxels(structure) {
+    if (structure && Array.isArray(structure.voxels)) {
+      return structure.voxels.map(v => [...v]);
+    }
+
+    const voxels = [];
+    structure.forEach((row, z) =>
+      row.forEach((height, x) => {
+        for (let y = 0; y < height; y++) voxels.push([x,y,z]);
+      })
+    );
+    return voxels;
+  }
+
+  function structureBounds(structure) {
+    const voxels = structureToVoxels(structure);
+    const maxX = Math.max(0, ...voxels.map(v => v[0]));
+    const maxY = Math.max(0, ...voxels.map(v => v[1]));
+    const maxZ = Math.max(0, ...voxels.map(v => v[2]));
+    return {voxels, cols:maxX+1, maxH:maxY+1, rows:maxZ+1};
+  }
+
+  function renderExerciseTabs() {
+    const root = $("#exercise-tabs");
+    root.innerHTML = "";
+
+    exercises.forEach((ex, i) => {
+      const p = state.progress[ex.id];
+      const b = document.createElement("button");
+      b.className = "exercise-tab" + (i === state.exerciseIndex ? " active" : "");
+      b.innerHTML = `תרגיל ${ex.number}<small>עמוד${ex.pages.includes("–") ? "ים" : ""} ${ex.pages} · ${p.done.filter(Boolean).length}/${ex.questions.length}</small>`;
+      b.onclick = () => {
+        state.exerciseIndex = i;
+        save();
+        render();
+      };
+      root.append(b);
+    });
+  }
+
+  function renderQuestionNav() {
+    const ex = currentExercise();
+    const p = currentProgress();
+    const root = $("#question-nav");
+    root.style.gridTemplateColumns = `repeat(${Math.min(ex.questions.length, 8)},1fr)`;
+    root.innerHTML = "";
+
+    ex.questions.forEach((q, i) => {
+      const b = document.createElement("button");
+      b.className =
+        "question-chip" +
+        (i === p.current ? " active" : "") +
+        (p.done[i] ? " done" : "");
+      b.textContent = q.label;
+      b.onclick = () => {
+        p.current = i;
+        save();
+        render();
+      };
+      root.append(b);
+    });
+  }
+
+  function updateProgress() {
+    if (!exercises.length) return;
+    const ex = currentExercise();
+    const p = currentProgress();
+    const n = p.done.filter(Boolean).length;
+
+    $("#progress-name").textContent = `תרגיל ${ex.number}`;
+    $("#progress-label").textContent = `${n} מתוך ${ex.questions.length}`;
+    $("#progress-bar").style.width = `${(n / ex.questions.length) * 100}%`;
+
+    $$(".question-chip").forEach((b, i) =>
+      b.classList.toggle("done", p.done[i])
+    );
+  }
+
+  function paintGrid(matrix, key) {
+    const p = currentProgress();
+    const root = document.createElement("div");
+    root.className = "cell-grid";
+    root.style.gridTemplateColumns = "repeat(5,max-content)";
+
+    matrix.forEach((row, r) =>
+      row.forEach((value, c) => {
+        const b = document.createElement("button");
+        b.className = "cell paint" + (value ? " on" : "");
+        b.setAttribute("aria-label", `${labels[key]}, שורה ${r + 1}, עמודה ${c + 1}`);
+        b.onclick = () => {
+          p.answers[p.current][key][r][c] = !value;
+          renderActivity();
+          save();
+        };
+        root.append(b);
+      })
+    );
+
+    return root;
+  }
+
+  function numberGrid(matrix) {
+    const p = currentProgress();
+    const root = document.createElement("div");
+    root.className = "cell-grid";
+    root.style.gridTemplateColumns = "repeat(5,max-content)";
+
+    matrix.forEach((row, r) =>
+      row.forEach((value, c) => {
+        const b = document.createElement("button");
+        b.className = "cell number" + (value ? " nonzero" : "");
+        b.innerHTML = `<span>${value}</span>${value ? '<span class="minus">−</span>' : ""}`;
+        b.setAttribute("aria-label", `תרשים מספרים, שורה ${r + 1}, עמודה ${c + 1}, גובה ${value}`);
+        b.onclick = e => {
+          p.answers[p.current].numbers[r][c] =
+            e.target.closest(".minus")
+              ? Math.max(0, value - 1)
+              : (value + 1) % 6;
+          renderActivity();
+          save();
+        };
+        root.append(b);
+      })
+    );
+
+    return root;
+  }
+
+  function answerZones(keys, results = null) {
+    const p = currentProgress();
+    const answer = p.answers[p.current];
+    const root = document.createElement("div");
+    root.className = "answer-zones";
+
+    keys.forEach(key => {
+      const zone = document.createElement("section");
+      zone.className =
+        `zone ${key === "numbers" ? "numbers " : ""}` +
+        (results ? (results[key] ? "correct" : "wrong") : "");
+
+      zone.innerHTML = `<h3>${labels[key]}</h3>`;
+      zone.append(key === "numbers" ? numberGrid(answer[key]) : paintGrid(answer[key], key));
+
+      const status = document.createElement("div");
+      status.className = "zone-status";
+      if (results) status.textContent = results[key] ? "נכון ✓" : "כדאי לבדוק שוב";
+      zone.append(status);
+      root.append(zone);
+    });
+
+    return root;
+  }
+
+  function feedbackHtml() {
+    return `
+      <div class="actions">
+        <button class="btn primary" id="check-answer">בדיקת תשובה</button>
+        <button class="btn secondary" id="clear-answer">ניקוי הסעיף</button>
+      </div>
+      <div class="feedback" id="feedback" role="status" aria-live="polite"></div>
+    `;
+  }
+
+  function renderStructureQuestion() {
+    const q = currentQuestion();
+    const root = $("#activity-root");
+
+    root.innerHTML = `
+      <div class="activity-layout">
+        <article class="activity-card">
+          <span class="question-kicker">סעיף ${q.label}</span>
+          <h2>התבוננו במבנה</h2>
+          <div class="fixed-viewer">
+            <canvas id="main-canvas"></canvas>
+            <div class="front-legend"><i></i> החץ מסמן את החזית</div>
+          </div>
+          <p class="viewer-caption">התבוננו במבנה מהזווית הנתונה.</p>
+        </article>
+
+        <article class="activity-card">
+          <span class="question-kicker">העבודה שלכם</span>
+          <h2>השלימו את התרשימים</h2>
+          <p class="work-instruction">אפשר למקם את התשובה בכל מקום בתוך הרשת.</p>
+          <div id="zones-slot"></div>
+          ${feedbackHtml()}
+        </article>
+      </div>
+    `;
+
+    $("#zones-slot").append(answerZones(["numbers","top","front","left","right"]));
+    requestAnimationFrame(() => drawStructure($("#main-canvas"), q.structure, true));
+    bindAnswerActions();
+  }
+
+  function renderNumberQuestion() {
+    const q = currentQuestion();
+    const root = $("#activity-root");
+
+    root.innerHTML = `
+      <div class="activity-layout">
+        <article class="activity-card">
+          <span class="question-kicker">סעיף ${q.label}</span>
+          <h2>תרשים המספרים הנתון</h2>
+          <div class="given-number-wrap">
+            <div>
+              <div class="given-number" id="given-number"></div>
+              <div class="front-arrow" aria-label="חץ לחזית"></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="activity-card">
+          <span class="question-kicker">העבודה שלכם</span>
+          <h2>סרטטו את ארבעת המבטים</h2>
+          <p class="work-instruction">לחצו על המשבצות המתאימות. אפשר למקם את התשובה בכל מקום בתוך הרשת.</p>
+          <div id="zones-slot"></div>
+          ${feedbackHtml()}
+        </article>
+      </div>
+    `;
+
+    const diagram = $("#given-number");
+    diagram.style.gridTemplateColumns = `repeat(${q.numbers[0].length},58px)`;
+
+    q.numbers.flat().forEach(n => {
+      const s = document.createElement("span");
+      s.className = n ? "" : "blank";
+      s.textContent = n || "";
+      diagram.append(s);
+    });
+
+    $("#zones-slot").append(answerZones(["top","front","left","right"]));
+    bindAnswerActions();
+  }
+
+  function miniView(matrix, title) {
+    const box = document.createElement("div");
+    box.className = "given-view";
+    box.innerHTML = `<h3>${labels[title] || title}</h3>`;
+
+    const grid = document.createElement("div");
+    grid.className = "mini-grid";
+    grid.style.gridTemplateColumns = `repeat(${matrix[0].length},32px)`;
+
+    matrix.flat().forEach(v => {
+      const i = document.createElement("i");
+      if (v) i.className = "on";
+      grid.append(i);
+    });
+
+    box.append(grid);
+    return box;
+  }
+
+  function renderMatchQuestion() {
+    const q = currentQuestion();
+    const p = currentProgress();
+    const answer = p.answers[p.current];
+    const root = $("#activity-root");
+
+    root.innerHTML = `
+      <div class="activity-layout single">
+        <article class="activity-card">
+          <span class="question-kicker">סעיף ${q.label}</span>
+          <h2>איזה מבנה מתאים למבטים?</h2>
+          <div class="given-views" id="given-views"></div>
+          <div class="option-grid" id="option-grid"></div>
+          ${feedbackHtml()}
+        </article>
+      </div>
+    `;
+
+    const order = q.viewOrder || Object.keys(q.views);
+    order.forEach(key => $("#given-views").append(miniView(q.views[key], key)));
+
+    q.options.forEach((structure, i) => {
+      const b = document.createElement("button");
+      b.className = "structure-option" + (answer.selected === i ? " selected" : "");
+      b.innerHTML = `<span class="option-number">${i + 1}</span><canvas></canvas>`;
+      b.onclick = () => {
+        answer.selected = i;
+        renderActivity();
+        save();
+      };
+      $("#option-grid").append(b);
+      requestAnimationFrame(() => drawStructure(b.querySelector("canvas"), structure, false));
+    });
+
+    bindAnswerActions();
+  }
+
+  function renderActivity() {
+    const type = currentExercise().type;
+    if (type === "structure-to-views") renderStructureQuestion();
+    else if (type === "numbers-to-views") renderNumberQuestion();
+    else renderMatchQuestion();
+  }
+
+  function bindAnswerActions() {
+    $("#check-answer").onclick = checkAnswer;
+    $("#clear-answer").onclick = clearAnswer;
+  }
+
+  function checkAnswer() {
+    const ex = currentExercise();
+    const q = currentQuestion();
+    const p = currentProgress();
+    const answer = p.answers[p.current];
+    const f = $("#feedback");
+
+    if (ex.type === "match-structure") {
+      if (answer.selected === null) {
+        f.className = "feedback show bad";
+        f.textContent = "בחרו קודם אחד מהמבנים.";
+        return;
+      }
+
+      const good = answer.selected === q.correct;
+      f.className = `feedback show ${good ? "good" : "bad"}`;
+      f.textContent = good
+        ? "מצוין! בחרתם את המבנה המתאים."
+        : "המבנה שבחרתם אינו מתאים לכל המבטים. נסו שוב.";
+
+      if (good) p.done[p.current] = true;
+
+      $$(".structure-option").forEach((b, i) => {
+        b.classList.toggle("correct", good && i === q.correct);
+        b.classList.toggle("wrong", !good && i === answer.selected);
+      });
+    } else {
+      const keys =
+        ex.type === "structure-to-views"
+          ? ["numbers","top","front","left","right"]
+          : ["top","front","left","right"];
+
+      const want = projections(ex.type === "structure-to-views" ? q.structure : q.numbers);
+      const results = {};
+
+      keys.forEach(k => {
+        results[k] = same(normalized(answer[k], k), normalized(want[k], k));
+      });
+
+      const wrong = keys.filter(k => !results[k]);
+
+      const zones = $("#zones-slot");
+      zones.innerHTML = "";
+      zones.append(answerZones(keys, results));
+
+      f.className = `feedback show ${wrong.length ? "bad" : "good"}`;
+      f.textContent = wrong.length
+        ? "עדיין לא הכול מתאים. בדקו שוב את: " + wrong.map(k => labels[k]).join(", ") + "."
+        : "מצוין! כל התרשימים נכונים.";
+
+      if (!wrong.length) p.done[p.current] = true;
+    }
+
+    save();
+    renderExerciseTabs();
+    renderQuestionNav();
+  }
+
+  function clearAnswer() {
+    const ex = currentExercise();
+    const p = currentProgress();
+    p.answers[p.current] = initialAnswer(ex.type);
+    p.done[p.current] = false;
+    save();
+    render();
+  }
+
+  function drawStructure(canvas, structure, arrow) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (!rect.width || !rect.height) return;
+
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const {voxels, cols, rows, maxH} = structureBounds(structure);
+
+    const yaw = Math.PI / 4;
+    const elev = 0.58;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const ce = Math.cos(elev), se = Math.sin(elev);
+
+    const span = Math.max(rows, cols);
+    const scale = Math.min(
+      rect.width / (span * 1.7 + 3.4),
+      rect.height / (maxH + span * 0.78 + 3.6)
+    );
+
+    const ox = rect.width / 2;
+    const oy = rect.height / 2 + scale * 0.1;
+    const targetY = (maxH - 1) / 2;
+
+    const project = (x, y, z) => {
+      const yy = y - targetY;
+      return {
+        x: ox + (x * cy - z * sy) * scale,
+        y: oy + (x * sy * se - yy * ce + z * cy * se) * scale,
+        depth: x * sy * ce + yy * se + z * cy * ce
+      };
+    };
+
+    const cam = {x: sy * ce, y: se, z: cy * ce};
+
+    const poly = (pts, fill, stroke = "rgba(13,62,71,.75)") => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+    };
+
+    const baseY = -0.5;
+    const base = [
+      project(-cols/2, baseY, -rows/2),
+      project(cols/2, baseY, -rows/2),
+      project(cols/2, baseY, rows/2),
+      project(-cols/2, baseY, rows/2)
+    ];
+    poly(base, "rgba(205,231,227,.8)", "#80afa9");
+
+    const corners = [
+      [-.47,-.47,-.47],[.47,-.47,-.47],[.47,.47,-.47],[-.47,.47,-.47],
+      [-.47,-.47,.47],[.47,-.47,.47],[.47,.47,.47],[-.47,.47,.47]
+    ];
+
+    const faces = [
+      {ids:[3,2,6,7], n:[0,1,0],  l:1.25},
+      {ids:[4,7,6,5], n:[0,0,1],  l:1},
+      {ids:[0,1,2,3], n:[0,0,-1], l:.7},
+      {ids:[1,5,6,2], n:[1,0,0],  l:.88},
+      {ids:[0,3,7,4], n:[-1,0,0], l:.66}
+    ];
+
+    const visible = [];
+
+    voxels.forEach(([gx, gy, gz]) => {
+      const x = gx - (cols - 1) / 2;
+      const z = gz - (rows - 1) / 2;
+      const pts = corners.map(([dx,dy,dz]) => project(x+dx, gy+dy, z+dz));
+
+      faces.forEach(face => {
+        const facing =
+          face.n[0] * cam.x +
+          face.n[1] * cam.y +
+          face.n[2] * cam.z;
+
+        if (facing <= .001) return;
+
+        const p = face.ids.map(i => pts[i]);
+        visible.push({
+          p,
+          depth: p.reduce((sum,v) => sum + v.depth, 0) / p.length,
+          fill: `hsl(${174 + Math.min(gy,7)*5} 58% ${Math.min(68, Math.round(43*face.l))}%)`
+        });
+      });
+    });
+
+    visible.sort((a,b) => a.depth - b.depth);
+    ctx.lineWidth = Math.max(1, scale * .018);
+    visible.forEach(f => poly(f.p, f.fill));
+
+    if (arrow) {
+      const start = project(0, -.16, rows/2 + 1.45);
+      const end = project(0, -.16, rows/2 + .28);
+      const dx = end.x - start.x, dy = end.y - start.y;
+      const len = Math.hypot(dx,dy);
+      const ux = dx/len, uy = dy/len, size = 13;
+
+      ctx.strokeStyle = ctx.fillStyle = "#ef463d";
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+
+      ctx.beginPath();
+      ctx.moveTo(start.x,start.y);
+      ctx.lineTo(end.x,end.y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(end.x,end.y);
+      ctx.lineTo(end.x-ux*size-uy*size*.6, end.y-uy*size+ux*size*.6);
+      ctx.lineTo(end.x-ux*size+uy*size*.6, end.y-uy*size-ux*size*.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function go(delta) {
+    const p = currentProgress();
+    const len = currentExercise().questions.length;
+    p.current = Math.max(0, Math.min(len - 1, p.current + delta));
+    save();
+    render();
+  }
+
+  function render() {
+    if (!exercises.length) {
+      $("#activity-root").innerHTML = "<p>לא נמצאו תרגילים.</p>";
+      return;
+    }
+
+    const ex = currentExercise();
+    const p = currentProgress();
+
+    renderExerciseTabs();
+
+    $("#page-ref").textContent = `עמוד${ex.pages.includes("–") ? "ים" : ""} ${ex.pages}`;
+    $("#lesson-title").textContent = `תרגיל ${ex.number}: ${ex.title}`;
+    $("#lesson-instruction").textContent = ex.instruction;
+
+    renderQuestionNav();
+    renderActivity();
+
+    $("#position-label").textContent = `סעיף ${p.current + 1} מתוך ${ex.questions.length}`;
+    $("#previous").disabled = p.current === 0;
+    $("#next").textContent = p.current === ex.questions.length - 1 ? "סיום" : "הסעיף הבא";
+
+    updateProgress();
+    window.scrollTo({top: 0});
+  }
+
+  $("#previous").onclick = () => go(-1);
+
+  $("#next").onclick = () => {
+    const ex = currentExercise();
+    const p = currentProgress();
+
+    if (p.current < ex.questions.length - 1) {
+      go(1);
+      return;
+    }
+
+    if (p.done.every(Boolean)) {
+      $("#finish-dialog").showModal();
+    } else {
+      const f = $("#feedback");
+      if (f) {
+        f.className = "feedback show bad";
+        f.textContent = "יש עוד סעיפים שלא הושלמו. אפשר לעבור אליהם מהסרגל העליון.";
+      }
+    }
+  };
+
+  $("#close-dialog").onclick = () => $("#finish-dialog").close();
+
+  $("#reset-exercise").onclick = () => {
+    if (!confirm("לאפס את כל התשובות בתרגיל הזה?")) return;
+    const ex = currentExercise();
+    state.progress[ex.id] = blankProgress(ex);
+    save();
+    render();
+  };
+
+  render();
 })();
