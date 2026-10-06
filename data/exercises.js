@@ -133,4 +133,24 @@ window.CUBE_EXERCISES = [
       { label: "ד׳", numbers: [[0,0,2],[1,0,1],[4,3,2]] }
     ]
   }
+  ,
+  {
+    id: "exercise-4",
+    number: 4,
+    pages: "6–7",
+    type: "structure-to-views",
+    title: "מבנים מקוביות II",
+    askCubeCount: true,
+    instruction: "עבור כל מבנה סרטטו תרשים מספרים, מבט מלמעלה, מבט מלפנים, מבט מימין ומבט משמאל. רשמו גם כמה קוביות נדרשות כדי לבנות את המבנה.",
+    questions: [
+      { label: "א׳", structure: [[0,2,2],[1,1,1]] },
+      { label: "ב׳", structure: [[2,3,2],[1,0,1]] },
+      { label: "ג׳", structure: [[1,2,1,1,1],[1,1,0,0,0]] },
+      { label: "ד׳", structure: [[2,2,0],[1,1,2],[1,1,1]] },
+      { label: "ה׳", structure: [[2,2,0,2],[1,2,1,1]] },
+      { label: "ו׳", structure: [[4,1,2,2],[0,0,1,2]] },
+      { label: "ז׳", structure: [[1,2,0],[2,1,2],[1,1,2]] },
+      { label: "ח׳", structure: [[0,2,3],[3,2,2],[3,0,1]] }
+    ]
+  }
 ];
