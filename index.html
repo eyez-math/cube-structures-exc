@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#123f47">
+  <meta name="description" content="חוברת אינטראקטיבית במבנים מקוביות">
+  <title>מבנים מקוביות — חוברת אינטראקטיבית</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23ffca58' d='M32 3 57 17 32 31 7 17z'/%3E%3Cpath fill='%232a8e91' d='m7 17 25 14v30L7 47z'/%3E%3Cpath fill='%23123a48' d='m57 17-25 14v30l25-14z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="modules.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#ffca58" d="M32 3 57 17 32 31 7 17z"/><path fill="#2a8e91" d="m7 17 25 14v30L7 47z"/><path fill="#123a48" d="m57 17-25 14v30l25-14z"/></svg><div><strong>מבנים מקוביות</strong><span>חוברת אינטראקטיבית</span></div></div>
+    <div class="course-progress"><div><span id="progress-name">תרגיל 1</span><b id="progress-label">0 מתוך 8</b></div><div class="bar"><i id="progress-bar"></i></div></div>
+  </header>
+  <main>
+    <nav class="exercise-tabs" id="exercise-tabs" aria-label="בחירת תרגיל"></nav>
+    <section class="lesson-head"><div><span class="page-ref" id="page-ref"></span><h1 id="lesson-title"></h1><p id="lesson-instruction"></p></div><button class="text-button" id="reset-exercise">איפוס התרגיל</button></section>
+    <nav class="question-nav" id="question-nav" aria-label="בחירת סעיף"></nav>
+    <section id="activity-root"></section>
+    <section class="bottom-nav"><button class="btn secondary" id="previous">הסעיף הקודם</button><div id="position-label"></div><button class="btn next" id="next">הסעיף הבא</button></section>
+  </main>
+  <dialog id="finish-dialog"><div class="celebration">✓</div><h2>התרגיל הושלם!</h2><p>כל הסעיפים נפתרו בהצלחה.</p><button class="btn primary" id="close-dialog">חזרה לתרגיל</button></dialog>
+  <script src="data/exercises.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
